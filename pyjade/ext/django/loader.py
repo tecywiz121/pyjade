@@ -7,7 +7,13 @@ try:
 except ImportError:  # Django < 1.9
     from django.template.base import TemplateDoesNotExist
 
-from django.template.loader import BaseLoader
+try:
+    from django.template.loaders.base import Loader as BaseLoader
+    _has_loader = True
+except ImportError: # Django <= 1.8
+    from django.template.loader import BaseLoader
+    _has_loader = False
+
 try:
     from django.template.engine import Engine
 except ImportError:  # Django < 1.8
@@ -47,10 +53,10 @@ except ImportError:  # Django >= 1.9
         make_origin = Engine.get_default().make_origin
 
 
-class Loader(BaseLoader):
+class _Loader(BaseLoader):
     is_usable = True
 
-    def __init__(self, loaders):
+    def __init__(self, engine, loaders):
         self.template_cache = {}
         self._loaders = loaders
         self._cached_loaders = []
@@ -58,7 +64,7 @@ class Loader(BaseLoader):
         try:
             from django.template.loader import find_template_loader as _find_template_loader
         except:
-            _find_template_loader = Engine.get_default().find_template_loader
+            _find_template_loader = engine.find_template_loader
         self._find_template_loader = _find_template_loader
 
     @property
@@ -131,3 +137,10 @@ class Loader(BaseLoader):
     def reset(self):
         "Empty the template cache."
         self.template_cache.clear()
+
+if _has_loader:
+    Loader = _Loader
+else:
+    class Loader(_Loader):
+        def __init__(self, loaders):
+            super(Loader, self).__init__(Engine.get_default(), loaders)
